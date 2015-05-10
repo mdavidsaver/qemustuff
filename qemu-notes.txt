@@ -1,0 +1,44 @@
+##http://cdimage.debian.org/cdimage/daily-builds/daily/arch-latest/i386/iso-cd/
+
+Fetch netinst CD image ~400MB
+
+http://cdimage.debian.org/debian-cd/8.0.0/i386/bt-cd/debian-8.0.0-i386-netinst.iso.torrent
+
+qemu-img create -f qcow2 wheezy.img 10G
+
+ln -s common.sh wheezy.sh
+
+./wheezy.sh -cdrom debian/debian-...-netinst.iso -boot order=d
+
+
+# with -monitor
+# needs package netcat-openbsd
+echo 'system_powerdown' | nc -U monitor/wheezy-upgrade.sock
+
+
+cat << EOF > /etc/X11/xorg.conf.d/10-monitor.conf
+
+## 10-monitor.conf for use x11 in a KVM Guest
+
+Section "Monitor"
+	Identifier "Monitor0"
+	HorizSync	1.0-10000.0
+	VertRefresh	1.0-10000.0
+EndSection
+
+Section "Device"
+	Identifier "Device0"
+	Driver	   "cirrus"
+EndSection
+
+Section "Screen"
+	Identifier   "Screen0"
+	Device       "Device0"
+	Monitor	     "Monitor0"
+	DefaultDepth  24
+	SubSection   "Display"
+	             Depth 24
+	 	     Modes "1024x768"
+	EndSubSection 
+EndSection
+EOF

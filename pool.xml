@@ -1,0 +1,10 @@
+<!--
+Save this file as poolxml, change /mnt/qemu/virt as appropriate, then run
+
+virsh pool-define default pool.xml
+virsh pool-autostart default
+-->
+<pool type="dir">
+<name>default</name>
+<target><path>/mnt/qemu/virt</path></target>
+</pool>

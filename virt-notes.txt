@@ -1,0 +1,27 @@
+cat << EOF > pool.xml
+<pool type="dir">
+<name>default</name>
+<target><path>/mnt/qemu/virt</path></target>
+</pool>
+EOF
+virsh pool-define default pool.xml
+virsh pool-autostart default
+
+virt-install \
+--virt-type kvm \
+--name jessie-i386 \
+--ram 2047 \
+--vcpu=4 \
+--os-type=linux \
+--os-variant=debianwheezy \
+--location=http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386 \
+--initrd-inject=preseed/jessie/preseed.cfg \
+--extra-args="auto priority=critical" \
+--disk pool=default,size=5,format=qcow2 \
+-w user \
+--graphics vnc,listen=127.0.0.1,port=5900
+
+
+# auto=true  auto url=http://10.0.0.1/server-base.cfg  priority=critical DEBIAN_FRONTEND=noninteractive install debconf/priority=medium debian-installer/allow_unauthenticated=true vga=788 initrd=debian/initrd.gz
+
+virt-sysprep --inplace --delete /var/lib/apt/lists foo.img
