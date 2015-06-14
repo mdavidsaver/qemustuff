@@ -1,3 +1,5 @@
 *.img
+*.conf
 *.qcow2
-/download
+/download/
+/bcache/
