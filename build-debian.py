@@ -108,12 +108,18 @@ class Builder(object):
 
     def run(self):
         from tempfile import TemporaryDirectory
+        from urllib.error import HTTPError
         with TemporaryDirectory() as D:
             self.workdir = D
             _log.debug('working in %s', self.workdir)
 
             self.getfile('pxelinux.0')
-            self.getfile('ldlinux.c32', subdir='boot-screens/')
+            try:
+                self.getfile('ldlinux.c32', subdir='boot-screens/')
+            except HTTPError as e:
+                # new requirement for debian 8
+                if e.getcode()!=404:
+                    raise
             self.getfile('linux')
             self.getfile('initrd.gz')
             os.mkdir(os.path.join(self.workdir, 'pxelinux.cfg'))
