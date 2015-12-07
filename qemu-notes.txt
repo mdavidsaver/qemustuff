@@ -15,3 +15,8 @@ cat << EOF >> /etc/fstab
 \\10.0.2.4\qemu /mnt/host cifs _netdev,guest,uid=1000,gid=1000,defaults 0 0
 EOF
 
+
+PPC install is not fully automatic
+
+d-i will fail to install quik bootloader.  Continue w/o bootloader.  Extract kernel and initrd from installed image, boot and run 'quikconfig'.  Now can boot normally.
+

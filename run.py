@@ -38,7 +38,19 @@ def getargs():
 deb2qemu = {
     'i386':'i386',
     'amd64':'x86_64',
+    'powerpc':'ppc',
 }
+
+def hostarch():
+    import platform, re
+    if re.match(r'i.86', platform.machine()):
+        return 'i386'
+    elif 'x86_64'==platform.machine():
+        return 'amd64'
+    elif 'ppc'==platform.machine():
+        return 'powerpc'
+    else:
+        raise RuntimeError('Unable to detect host arch (%s)'%platform.machine())
 
 def main(A):
     _log.debug('Args: %s', A)
@@ -49,9 +61,10 @@ def main(A):
         sys.exit(1)
 
     args = [exe]
-    if not os.path.isfile(A.conf):
+    if True:
+#    if not os.path.isfile(A.conf):
         _log.warn('Creating initial config %s', A.conf)
-        args += '-m 1024 -no-reboot -enable-kvm -vga qxl -usbdevice tablet'.split(' ')
+        args += '-m 1024 -no-reboot -usbdevice tablet'.split(' ')
         args += ['-display', 'none']
         args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
         args += ['-device', 'virtio-serial-pci']
@@ -60,6 +73,12 @@ def main(A):
         args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
         args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
         A.write_conf = True
+
+        if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
+            args += ['-enable-kvm']
+
+        if A.arch!='powerpc':
+            args += ['-vga','qxl']
 
     else:
         _log.info('Existing config %s', A.conf)

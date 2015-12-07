@@ -41,28 +41,41 @@ def getargs():
 deb2qemu = {
     'i386':'i386',
     'amd64':'x86_64',
+    'powerpc':'ppc',
 }
+
+def hostarch():
+    import platform, re
+    if re.match(r'i.86', platform.machine()):
+        return = 'i386'
+    elif 'x86_64'==platform.machine():
+        return 'amd64'
+    else:
+        raise RuntimeError('Unable to detect host arch (%s)'%platform.machine())
 
 class Builder(object):
     def __init__(self, args):
         self.args = args
         self.arch = args.arch
         if args.arch=='host':
-            import platform, re
-            if re.match(r'i.86', platform.machine()):
-                self.arch = 'i386'
-            elif 'x86_64'==platform.machine():
-                self.arch = 'amd64'
-            else:
-                raise RuntimeError('Unable to detect host arch (%s), use --arch to give explicitly'%platform.machine())
+            self.arch = hostarch()
 
         os.makedirs(args.cache, exist_ok=True)
 
         self.baseurl = args.baseurl
         if self.baseurl[-1]!='/':
             self.baseurl = self.baseurl+'/'
-        # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386/current/images/netboot/debian-installer/i386/
-        self.baseurl = '%s%s/main/installer-%s/current/images/netboot/debian-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
+
+        if self.arch in ['i386','amd64']:
+            # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386/current/images/netboot/debian-installer/i386/
+            self.baseurl = '%s%s/main/installer-%s/current/images/netboot/debian-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
+
+        elif self.arch == 'powerpc':
+            # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-powerpc/current/images/powerpc/netboot/vmlinux
+            self.baseurl = '%s%s/main/installer-%s/current/images/powerpc/netboot/'%(self.baseurl, args.dist, self.arch)
+        else:
+            raise RuntimeError("Unsupported arch "+self.arch)
+            # eg. 
         _log.info('Fetching from %s', self.baseurl)
 
     def getfile(self, fname, subdir=''):
@@ -109,43 +122,57 @@ class Builder(object):
     def run(self):
         from tempfile import TemporaryDirectory
         from urllib.error import HTTPError
+
+        exe = shutil.which('qemu-system-%s'%deb2qemu[self.arch])
+        if not exe:
+            _log.error('Failed to find emulator for %s', deb2qemu[self.arch])
+            sys.exit(1)
+
+        args = [exe]
+        args += '-boot order=n -m 1024 -no-reboot -usbdevice tablet'.split(' ')
+        args += ['-drive', 'file=%s,aio=native,cache=writethrough'%self.args.image]
+
         with TemporaryDirectory() as D:
             self.workdir = D
             _log.debug('working in %s', self.workdir)
-
-            self.getfile('pxelinux.0')
-            try:
-                self.getfile('ldlinux.c32', subdir='boot-screens/')
-            except HTTPError as e:
-                # new requirement for debian 8
-                if e.getcode()!=404:
-                    raise
-            self.getfile('linux')
-            self.getfile('initrd.gz')
-            os.mkdir(os.path.join(self.workdir, 'pxelinux.cfg'))
 
             PS = False
             if self.args.preseed:
                 shutil.copyfile(self.args.preseed, os.path.join(self.workdir, 'preseed.cfg'))
                 PS = True
 
-            with open(os.path.join(self.workdir, 'pxelinux.cfg', 'default'), 'w') as F:
-                F.write("label default\nkernel linux\nappend initrd=initrd.gz")
-                if PS:
-                    F.write(" auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet")
-                F.write("\ndefault default\nprompt 1\ntimeout 30\n")
+            if self.arch in ['i386','amd64']:
+                self.getfile('pxelinux.0')
+                try:
+                    self.getfile('ldlinux.c32', subdir='boot-screens/')
+                except HTTPError as e:
 
-            exe = shutil.which('qemu-system-%s'%deb2qemu[self.arch])
-            if not exe:
-                _log.error('Failed to find emulator for %s', deb2qemu[self.arch])
-                sys.exit(1)
+                    # new requirement for debian 8
+                    if e.getcode()!=404:
+                        raise
+                self.getfile('linux')
+
+                os.mkdir(os.path.join(self.workdir, 'pxelinux.cfg'))
+
+                with open(os.path.join(self.workdir, 'pxelinux.cfg', 'default'), 'w') as F:
+                    F.write("label default\nkernel linux\nappend initrd=initrd.gz")
+                    if PS:
+                        F.write(" auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet")
+                    F.write("\ndefault default\nprompt 1\ntimeout 30\n")
+            
+                args += ['-enable-kvm','-vga','qxl']
+                args += ['-net', 'nic', '-net', 'user,tftp=%s,bootfile=/pxelinux.0'%self.workdir]
+
+            elif self.arch=='powerpc':
+                self.getfile('vmlinux')
+                args += ['-net', 'nic', '-net', 'user,tftp=%s'%self.workdir, '-kernel', 'vmlinux', '-initrd', 'initrd.gz']
+                if PS:
+                    args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']
+
+            self.getfile('initrd.gz')
 
             _log.debug('emulator %s', exe)
 
-            args = [exe]
-            args += '-boot order=n -m 1024 -no-reboot -enable-kvm -vga qxl -usbdevice tablet'.split(' ')
-            args += ['-drive', 'file=%s,aio=native,cache=writethrough'%self.args.image]
-            args += ['-net', 'nic', '-net', 'user,tftp=%s,bootfile=/pxelinux.0'%self.workdir]
             _log.debug('Invoke: %s', ' '.join(args))
 
             _log.info('Run emulator')
