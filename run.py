@@ -18,8 +18,6 @@ def getargs():
     P.add_argument('image', metavar='NAME', help='VM image file name')
     P.add_argument('qemuargs', nargs='*')
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
-    P.add_argument('-W', '--write-conf', action='store_true')
-    P.add_argument('-C','--conf',metavar='FILE', help='config file name')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
 
     A = P.parse_args()
@@ -30,8 +28,6 @@ def getargs():
         P.error('%s not a file'%A.image)
     A.name = M.group(1)
     A.arch = M.group(2)
-    if not A.conf:
-        A.conf = '%s-%s.conf'%(A.name, A.arch)
     return A
 
 # arch. name mapping from debian to qemu conventions
@@ -61,40 +57,37 @@ def main(A):
         sys.exit(1)
 
     args = [exe]
-    if True:
-#    if not os.path.isfile(A.conf):
-        _log.warn('Creating initial config %s', A.conf)
-        args += '-m 1024 -no-reboot -usbdevice tablet'.split(' ')
-        args += ['-display', 'none']
-        args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
-        args += ['-device', 'virtio-serial-pci']
-        args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
-        args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
-        args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
-        args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
-        A.write_conf = True
+    _log.warn('SPICE port %d', A.port)
+    args += '-m 1024 -enable-kvm -vga qxl -usbdevice tablet'.split(' ')
+    args += ['-display', 'none']
+    args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
+    args += ['-monitor','chardev:monitor']
+    args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
+    args += ['-device', 'virtio-serial-pci']
+    args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
+    args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
+    args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
+    args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
 
-        if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
-            args += ['-enable-kvm']
+    if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
+        args += ['-enable-kvm']
 
-        if A.arch!='powerpc':
-            args += ['-vga','qxl']
-
-    else:
-        _log.info('Existing config %s', A.conf)
-        args += ['-display', 'none']
-        args += ['-readconfig', A.conf]
+    if A.arch!='powerpc':
+        args += ['-vga','qxl']
 
     args += A.qemuargs
-
-    if A.write_conf:
-        args += ['-writeconfig', A.conf]
 
     _log.debug('Invoke: %s', ' '.join(args))
 
     _log.info('Run emulator')
     from subprocess import check_call
     check_call(args)
+
+    try:
+        os.remove(A.image+".sock")
+    except OSError as e:
+        if e.errno!=2:
+            raise
 
 if __name__=='__main__':
     A = getargs()
