@@ -18,7 +18,6 @@ def getargs():
     P.add_argument('image', metavar='NAME', help='VM image file name')
     P.add_argument('qemuargs', nargs='*')
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
-    P.add_argument('-W', '--write-conf', action='store_true')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
 
     A = P.parse_args()
@@ -59,9 +58,6 @@ def main(A):
     args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
 
     args += A.qemuargs
-
-    if A.write_conf:
-        args += ['-writeconfig', A.conf]
 
     _log.debug('Invoke: %s', ' '.join(args))
 
