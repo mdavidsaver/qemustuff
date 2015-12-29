@@ -44,10 +44,17 @@ deb2qemu = {
     'powerpc':'ppc',
 }
 
+kvm_allowed = set([
+    # host    target
+    ('amd64', 'amd64'),
+    ('amd64', 'i386'),
+    ('i386',  'i386'),
+])
+
 def hostarch():
     import platform, re
     if re.match(r'i.86', platform.machine()):
-        return = 'i386'
+        return 'i386'
     elif 'x86_64'==platform.machine():
         return 'amd64'
     else:
@@ -129,6 +136,10 @@ class Builder(object):
             sys.exit(1)
 
         args = [exe]
+
+        if (hostarch(), self.arch) in kvm_allowed:
+            args += ['-enable-kvm','-vga','qxl']
+
         args += '-boot order=n -m 1024 -no-reboot -usbdevice tablet'.split(' ')
         args += ['-drive', 'file=%s,aio=native,cache=writethrough'%self.args.image]
 
@@ -142,33 +153,17 @@ class Builder(object):
                 PS = True
 
             if self.arch in ['i386','amd64']:
-                self.getfile('pxelinux.0')
-                try:
-                    self.getfile('ldlinux.c32', subdir='boot-screens/')
-                except HTTPError as e:
-
-                    # new requirement for debian 8
-                    if e.getcode()!=404:
-                        raise
-                self.getfile('linux')
-
-                os.mkdir(os.path.join(self.workdir, 'pxelinux.cfg'))
-
-                with open(os.path.join(self.workdir, 'pxelinux.cfg', 'default'), 'w') as F:
-                    F.write("label default\nkernel linux\nappend initrd=initrd.gz")
-                    if PS:
-                        F.write(" auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet")
-                    F.write("\ndefault default\nprompt 1\ntimeout 30\n")
-            
-                args += ['-enable-kvm','-vga','qxl']
-                args += ['-net', 'nic', '-net', 'user,tftp=%s,bootfile=/pxelinux.0'%self.workdir]
+                kernname = 'linux'
 
             elif self.arch=='powerpc':
-                self.getfile('vmlinux')
-                args += ['-net', 'nic', '-net', 'user,tftp=%s'%self.workdir, '-kernel', 'vmlinux', '-initrd', 'initrd.gz']
-                if PS:
-                    args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']
+                kernname = 'vmlinux'
 
+            args += ['-net', 'nic', '-net', 'user,tftp=%s'%self.workdir,
+                     '-kernel', os.path.join(D, kernname), '-initrd', os.path.join(D, 'initrd.gz')]
+            if PS:
+                args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']
+
+            self.getfile(kernname)
             self.getfile('initrd.gz')
 
             _log.debug('emulator %s', exe)
