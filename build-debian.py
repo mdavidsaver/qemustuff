@@ -11,7 +11,7 @@ The preseed file is loaded via. TFTP (supported by d-i as per debian bug #509723
 import logging
 _log = logging.getLogger(__name__)
 
-import os, sys
+import os, os.path, sys
 import shutil
 
 def getargs():
@@ -28,10 +28,11 @@ def getargs():
         return name
 
     P = argparse.ArgumentParser(description='Populate Debian vm image')
-    P.add_argument('image', metavar='FILE', help='VM image file name', type=isfile)
+    P.add_argument('image', metavar='FILE', help='VM image file name')
     P.add_argument('-a','--arch',metavar='NAME', default='host', help='Debian arch. name')
     P.add_argument('-d','--dist',metavar='NAME', default='jessie', help='Debian code name')
     P.add_argument('-P','--preseed',metavar='FILE',help='Debian pre-seed file', type=isfile)
+    P.add_argument('-S','--size',metavar='NUM',help='Size of image (if not existant)')
     P.add_argument('--cache',metavar='DIR',default=os.path.join(os.getcwd(),'bcache'))
     P.add_argument('--baseurl',metavar='URL',default='http://ftp.us.debian.org/debian/dists/')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
@@ -126,6 +127,17 @@ class Builder(object):
 
         shutil.copyfile(cachename, os.path.join(self.workdir, fname))
 
+    def make_image(self):
+        S = self.args.size
+        if not os.path.exists(self.args.image):
+            if not S:
+                raise RuntimeError("Image file does not exist and no valid size is provided")
+            from subprocess import check_call
+            _log.info("Create image file '%s' with %s"%(self.args.image, S))
+            check_call(['qemu-img','create',self.args.image,S])
+        elif S:
+            raise RuntimeError("Image file exists so size size can not be provided")
+
     def run(self):
         from tempfile import TemporaryDirectory
         from urllib.error import HTTPError
@@ -134,6 +146,8 @@ class Builder(object):
         if not exe:
             _log.error('Failed to find emulator for %s', deb2qemu[self.arch])
             sys.exit(1)
+
+        self.make_image()
 
         args = [exe]
 
