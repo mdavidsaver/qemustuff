@@ -14,11 +14,17 @@ def getargs():
             raise argparse.ArgumentTypeError('invalid log level %s'%A.lvl)
         return L
 
+    def isfile(name):
+        if not os.path.isfile(name):
+            raise argparse.ArgumentTypeError('file does not exist %s'%name)
+        return name
+
     P = argparse.ArgumentParser(description='Run VM image')
-    P.add_argument('image', metavar='NAME', help='VM image file name')
+    P.add_argument('image', metavar='NAME', help='VM image file name', type=isfile)
     P.add_argument('qemuargs', nargs='*')
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
+    P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
 
     A = P.parse_args()
     M = re.match(r'([^-]+)-([^.]+).img', A.image)
@@ -26,6 +32,8 @@ def getargs():
         P.error('incorrect image name format.  Must be "name-arch.img"')
     elif not os.path.isfile(A.image):
         P.error('%s not a file'%A.image)
+    if not A.ga:
+        A.ga = A.image+'.sock'
     A.name = M.group(1)
     A.arch = M.group(2)
     return A
@@ -58,16 +66,24 @@ def main(A):
 
     args = [exe]
     _log.warn('SPICE port %d', A.port)
-    args += '-m 1024 -enable-kvm -vga qxl -usbdevice tablet'.split(' ')
+    args += '-m 1024 -usbdevice tablet'.split(' ')
     args += ['-display', 'none']
-    args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
-    args += ['-monitor','chardev:monitor']
-    args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
     args += ['-device', 'virtio-serial-pci']
+    # unix socket for monitor console
+    #args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
+    #args += ['-monitor','chardev:monitor']
+    # spice
+    args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
     args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
     args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
+    # guest agent
+    args += ['-chardev', 'socket,path=%s,server,nowait,id=agent'%(A.ga,),
+             '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
+    # disk
     args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
+    # net
     args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
+
 
     if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
         args += ['-enable-kvm']
