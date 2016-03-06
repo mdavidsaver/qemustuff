@@ -70,19 +70,29 @@ class Builder(object):
 
         os.makedirs(args.cache, exist_ok=True)
 
-        self.baseurl = args.baseurl
-        if self.baseurl[-1]!='/':
-            self.baseurl = self.baseurl+'/'
+        if args.dist.startswith('ubuntu:'):
+            args.dist = args.dist.split(':',1)[1]
+            self.baseurl = 'http://archive.ubuntu.com/ubuntu/dists/'
 
-        if self.arch in ['i386','amd64']:
-            # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386/current/images/netboot/debian-installer/i386/
-            self.baseurl = '%s%s/main/installer-%s/current/images/netboot/debian-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
+            if self.arch in ['i386','amd64']:
+                # eg. http://archive.ubuntu.com/ubuntu/dists/precise-updates/main/installer-i386/current/images/netboot/ubuntu-installer/i386/
+                self.baseurl = '%s%s-updates/main/installer-%s/current/images/netboot/ubuntu-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
 
-        elif self.arch == 'powerpc':
-            # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-powerpc/current/images/powerpc/netboot/vmlinux
-            self.baseurl = '%s%s/main/installer-%s/current/images/powerpc/netboot/'%(self.baseurl, args.dist, self.arch)
+            else:
+                raise RuntimeError("Unsupported arch "+self.arch)
+
         else:
-            raise RuntimeError("Unsupported arch "+self.arch)
+            self.baseurl = 'http://ftp.us.debian.org/debian/dists/'
+
+            if self.arch in ['i386','amd64']:
+                # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386/current/images/netboot/debian-installer/i386/
+                self.baseurl = '%s%s/main/installer-%s/current/images/netboot/debian-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
+
+            elif self.arch == 'powerpc':
+                # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-powerpc/current/images/powerpc/netboot/vmlinux
+                self.baseurl = '%s%s/main/installer-%s/current/images/powerpc/netboot/'%(self.baseurl, args.dist, self.arch)
+            else:
+                raise RuntimeError("Unsupported arch "+self.arch)
             # eg. 
         _log.info('Fetching from %s', self.baseurl)
 
