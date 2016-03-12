@@ -16,6 +16,8 @@ import shutil
 
 from debtricks.archive import Archive
 
+imat = os.path.normpath(os.path.dirname(os.path.join(os.getcwd(), sys.argv[0])))
+
 def getargs():
     import argparse
     def lvl(name):
@@ -143,6 +145,12 @@ class Builder(object):
                      '-kernel', os.path.join(D, kernname), '-initrd', os.path.join(D, 'initrd.gz')]
             if PS:
                 args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']
+                shutil.copyfile(os.path.join(imat, 'postinst.sh'),
+                                os.path.join(self.workdir, 'postinst.sh'))
+                with open(os.path.join(self.workdir, 'preseed.cfg'), 'ab') as FP:
+                    FP.write(b"""
+d-i preseed/late_command string tftp -l ~/postinst.sh -r postinst.sh -g 10.0.2.2; sh ~/postinst.sh
+""")
 
             self.getfile(kernname)
             self.getfile('initrd.gz')
