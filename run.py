@@ -24,6 +24,9 @@ def getargs():
     P.add_argument('qemuargs', nargs='*')
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
+    P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
+    P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
+    P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
 
     A = P.parse_args()
@@ -66,8 +69,7 @@ def main(A):
 
     args = [exe]
     _log.warn('SPICE port %d', A.port)
-    args += '-m 1024 -usbdevice tablet'.split(' ')
-    args += ['-display', 'none']
+    args += ['-m','%d'%A.mem, '-usbdevice', 'tablet', '-display', 'none']
     args += ['-device', 'virtio-serial-pci']
     # unix socket for monitor console
     #args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
@@ -82,8 +84,12 @@ def main(A):
     # disk
     args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
     # net
-    args += ['-net', 'nic', '-net', 'user,smb=%s'%os.path.expanduser('~')]
+    net = ['user','smb=%s'%os.path.expanduser('~')]
+    net.extend(A.net)
+    args += ['-net', 'nic', '-net', ','.join(net)]
 
+    if A.smp>1:
+        args += ['-smp','cpus=%d'%A.smp]
 
     if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
         args += ['-enable-kvm']
