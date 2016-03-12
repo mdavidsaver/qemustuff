@@ -1,5 +1,7 @@
+*.pyc
 *.img
 *.conf
 *.qcow2
 /download/
 /bcache/
+__pycache__

@@ -14,6 +14,8 @@ _log = logging.getLogger(__name__)
 import os, os.path, sys
 import shutil
 
+from debtricks.archive import Archive
+
 def getargs():
     import argparse
     def lvl(name):
@@ -33,7 +35,6 @@ def getargs():
     P.add_argument('-d','--dist',metavar='NAME', default='jessie', help='Debian code name')
     P.add_argument('-P','--preseed',metavar='FILE',help='Debian pre-seed file', type=isfile)
     P.add_argument('-S','--size',metavar='NUM',help='Size of image (if not existant)')
-    P.add_argument('--cache',metavar='DIR',default=os.path.join(os.getcwd(),'bcache'))
     P.add_argument('--baseurl',metavar='URL',default='http://ftp.us.debian.org/debian/dists/')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
     return P.parse_args()
@@ -68,74 +69,30 @@ class Builder(object):
         if args.arch=='host':
             self.arch = hostarch()
 
-        os.makedirs(args.cache, exist_ok=True)
-
-        if args.dist.startswith('ubuntu:'):
-            args.dist = args.dist.split(':',1)[1]
-            self.baseurl = 'http://archive.ubuntu.com/ubuntu/dists/'
-
+        if args.dist.find(':')!=-1:
+            os, _, args.dist = args.dist.partition(':')
+            arch = Archive(os, args.dist)
+            installer = arch.installer(self.arch)
             if self.arch in ['i386','amd64']:
-                # eg. http://archive.ubuntu.com/ubuntu/dists/precise-updates/main/installer-i386/current/images/netboot/ubuntu-installer/i386/
-                self.baseurl = '%s%s-updates/main/installer-%s/current/images/netboot/ubuntu-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
-
+                self.fetch = installer.cd('netboot/ubuntu-installer/%s/'%self.arch)
             else:
                 raise RuntimeError("Unsupported arch "+self.arch)
-
         else:
-            self.baseurl = 'http://ftp.us.debian.org/debian/dists/'
-
+            arch = Archive('debian', args.dist)
+            installer = arch.installer(self.arch)
             if self.arch in ['i386','amd64']:
-                # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-i386/current/images/netboot/debian-installer/i386/
-                self.baseurl = '%s%s/main/installer-%s/current/images/netboot/debian-installer/%s/'%(self.baseurl, args.dist, self.arch, self.arch)
-
-            elif self.arch == 'powerpc':
-                # eg. http://ftp.us.debian.org/debian/dists/jessie/main/installer-powerpc/current/images/powerpc/netboot/vmlinux
-                self.baseurl = '%s%s/main/installer-%s/current/images/powerpc/netboot/'%(self.baseurl, args.dist, self.arch)
+                self.fetch = installer.cd('netboot/debian-installer/%s/'%self.arch)
             else:
-                raise RuntimeError("Unsupported arch "+self.arch)
-            # eg. 
-        _log.info('Fetching from %s', self.baseurl)
+                self.fetch = installer.cd('powerpc/netboot/')
+
+        _log.info('Fetching from %s', self.fetch)
 
     def getfile(self, fname, subdir=''):
         """Fetch a file if not in local cache
         """
-        _log.info('Fetch %s', fname)
-        from urllib.request import urlopen, Request
-        from urllib.error import HTTPError
-        from time import strftime, gmtime
-        url = '%s%s%s'%(self.baseurl, subdir, fname)
-        _log.debug(' from %s', url)
-        cachename = os.path.join(self.args.cache, url.replace('/','_'))
-        _log.debug(' cache as %s', cachename)
-        H = {}
-        try:
-            S = os.stat(cachename)
-            #Note: there is the possibility of a race if the file is updated
-            #      while being downloaded.  But this seems unlikely...
-            H['If-Modified-Since'] = strftime('%a, %d %b %Y %H:%M:%S GMT',
-                                              gmtime(S.st_mtime))
-        except FileNotFoundError:
-            pass
-
-        try:
-            R = urlopen(Request(url, headers=H), timeout=10)
-            assert R.getcode()==200, R.getcode()
-            _log.debug('info: %s', R.info())
-            with open(cachename, 'wb') as F:
-                while True:
-                    D = R.read(16*1024)
-                    if len(D)==0:
-                        break
-                    F.write(D)
-                _log.info(' downloaded %d bytes', F.tell())
-            R.close()
-        except HTTPError as e:
-            if e.code==304: # not modified
-                _log.info(' using cached copy')
-            else:
-                raise
-
-        shutil.copyfile(cachename, os.path.join(self.workdir, fname))
+        with self.fetch.getfile(subdir+fname) as F:
+            with open(os.path.join(self.workdir, fname), 'wb') as O:
+                shutil.copyfileobj(F,O)
 
     def make_image(self):
         S = self.args.size
