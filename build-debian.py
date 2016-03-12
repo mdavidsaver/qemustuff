@@ -19,7 +19,7 @@ def getargs():
     def lvl(name):
         L = logging.getLevelName(name)
         if type(L)!=int:
-            raise argparse.ArgumentTypeError('invalid log level %s'%A.lvl)
+            raise argparse.ArgumentTypeError('invalid log level %s'%L)
         return L
 
     def isfile(name):
