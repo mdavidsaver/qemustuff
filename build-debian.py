@@ -124,7 +124,8 @@ class Builder(object):
             args += ['-enable-kvm','-vga','qxl']
 
         args += '-boot order=n -m 1024 -no-reboot -usbdevice tablet'.split(' ')
-        args += ['-drive', 'file=%s,aio=native,cache=writethrough'%self.args.image]
+        # cache=unsafe means qemu crash -> corrupt image, but if install fails then we redo anyway
+        args += ['-drive', 'file=%s,aio=native,cache=unsafe'%self.args.image]
 
         with TemporaryDirectory() as D:
             self.workdir = D
