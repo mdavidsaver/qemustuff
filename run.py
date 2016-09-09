@@ -28,6 +28,7 @@ def getargs():
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
+    P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
 
     A = P.parse_args()
     M = re.match(r'([^-]+)-([^.]+).img', A.image)
@@ -62,7 +63,7 @@ def hostarch():
 def main(A):
     _log.debug('Args: %s', A)
     
-    exe = shutil.which('qemu-system-%s'%deb2qemu[A.arch])
+    exe = A.exe or shutil.which('qemu-system-%s'%deb2qemu[A.arch])
     if not exe:
         _log.error('Failed to find emulator for %s', deb2qemu[A.arch])
         sys.exit(1)
@@ -82,7 +83,7 @@ def main(A):
     args += ['-chardev', 'socket,path=%s,server,nowait,id=agent'%(A.ga,),
              '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
     # disk
-    args += ['-drive', 'file=%s,aio=native,cache=writethrough'%A.image]
+    args += ['-drive', 'file=%s,index=0,media=disk'%A.image]
     # net
     net = ['user','smb=%s'%os.path.expanduser('~')]
     net.extend(A.net)
