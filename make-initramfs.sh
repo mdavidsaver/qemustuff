@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -e -x
 # Create an initramfs image with some basic tools
 # found on the host system (including the running kernel)
 #  needs: busybox cifs-utils
@@ -11,6 +11,10 @@ die() {
   echo "$1"
   exit 1
 }
+
+[ -x /sbin/mount.cifs ] || die "Missing cifs-utils"
+[ -x /usr/bin/strace ] || die "Missing strace"
+[ -x /bin/busybox ] || die "Missing busybox"
 
 # So that 'which' will find things
 PATH=/sbin:/usr/sbin:$PATH
@@ -55,11 +59,33 @@ getbin() {
   ldd "$name" | awk '/=>/ { print $3 }' | while read lib; do copylib $lib; done
 }
 
-mkdir bin
+getfile() {
+  install -d "$(dirname "$PWD/$1")"
+  cp -arP $1 $PWD/$1
+  echo "copy in $1"
+}
+
+install -d bin
 echo "Copy in system executables"
 getbin `which busybox`
 getbin `which strace`
 getbin `which mount.cifs`
+
+getbin /sbin/ethtool
+
+getbin /usr/bin/lspci
+getbin /usr/bin/pcimodules
+getfile /usr/share/misc/pci.ids
+
+getbin /sbin/dhclient
+getbin /sbin/dhclient-script
+getfile /etc/dhcp/dhclient-*-hooks.d
+install -d var/lib/dhcp
+
+if [ -x /usr/bin/ipmitool ]; then
+  getbin /usr/bin/ipmitool
+  getfile /usr/share/ipmitool
+fi
 
 #echo "Copy in python2.7"
 #getbin `which python2.7`
@@ -86,7 +112,8 @@ do
   cp "/lib/modules/$KVER/$nn" "lib/modules/$KVER/$nn"
 done
 
-for kd in arch crypto fs lib mm net/core net/ipv4 net/ipv6 net/unix drivers/ata drivers/scsi drivers/virtio drivers/net/ethernet
+for kd in arch crypto fs lib mm net/core net/ipv4 net/ipv6 net/unix drivers/ata drivers/scsi drivers/virtio drivers/net/ethernet \
+ drivers/char/ipmi drivers/acpi
 do
   install -d "$(dirname "lib/modules/$KVER/kernel/$kd")"
   rsync -a "/lib/modules/$KVER/kernel/$kd/" "lib/modules/$KVER/kernel/$kd"
@@ -107,17 +134,16 @@ done
 ln -sT bin/busybox init
 
 echo "Populate /dev"
-mkdir dev
-mkdir dev/pts
+install -d dev/pts
 
 for dd in /dev/console /dev/*random /dev/tty /dev/tty? /dev/ttyS0 /dev/zero
 do
   cp -a $dd ${dd#/}
 done
 
-mkdir etc
-mkdir proc
-mkdir sys
+install -d etc
+install -d proc
+install -d sys
 cat << EOF > etc/fstab
 sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime,defaults 0 0
 proc /proc proc rw,nosuid,nodev,noexec,relatime,defaults 0 0
@@ -167,7 +193,7 @@ else
   echo "No NIC"
 fi
 
-mkdir -p /mnt/host
+install -d /mnt/host
 mount.cifs -o guest '\\\\10.0.2.4\qemu' /mnt/host
 
 EOF
