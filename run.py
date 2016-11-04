@@ -27,6 +27,7 @@ def getargs():
     P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
+    P.add_argument('-D','--display',metavar='spice|X',default='spice',help='Display method')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
     P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
 
@@ -70,15 +71,21 @@ def main(A):
 
     args = [exe]
     _log.warn('SPICE port %d', A.port)
-    args += ['-m','%d'%A.mem, '-usbdevice', 'tablet', '-display', 'none']
+    args += ['-m','%d'%A.mem, '-usbdevice', 'tablet']
     args += ['-device', 'virtio-serial-pci']
     # unix socket for monitor console
     #args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
     #args += ['-monitor','chardev:monitor']
     # spice
-    args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
-    args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
-    args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
+    if A.display=='spice':
+        args += ['-display','none']
+        args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
+        args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
+        args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
+    elif A.display=='X':
+        pass
+    else:
+        _log.error("Unknown display method %s", A.display)
     # guest agent
     args += ['-chardev', 'socket,path=%s,server,nowait,id=agent'%(A.ga,),
              '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
