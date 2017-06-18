@@ -50,8 +50,9 @@ def proc_release(rel):
     """
     info = defaultdict(dict)
     for S in HASHS:
-        for ent in rel[S]:
-            info[ent['name']].update(ent)
+        if S in rel:
+            for ent in rel[S]:
+                info[ent['name']].update(ent)
 
     return info
 
