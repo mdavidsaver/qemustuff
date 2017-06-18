@@ -6,7 +6,7 @@ _log = logging.getLogger(__name__)
 
 import os, sys, hashlib, stat, time
 from glob import glob
-from subprocess import check_call
+from subprocess import check_call, check_output
 from tempfile import TemporaryDirectory, SpooledTemporaryFile
 from collections import defaultdict
 from shutil import copyfileobj
@@ -25,6 +25,17 @@ __all__ = [
     'Archive',
 ]
 
+def gpg_mangle_trust(content):
+    ret = []
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line[:1]==b'#':
+            continue
+        parts = line.split(b':')
+        # set trust ultimate for all
+        ret.append(parts[0]+b':6:\n')
+    return b''.join(ret)
+
 def gpg_verify(content, sig):
     with TemporaryDirectory() as D:
         gpgdir = os.path.join(D,'gpg')
@@ -33,7 +44,7 @@ def gpg_verify(content, sig):
 
         cfile =  os.path.join(D,'file')
         sfile =  os.path.join(D,'sig')
-        os.mkdir(gpgdir)
+        os.mkdir(gpgdir, mode=0o700)
 
         check_call([GPG, '--import']+KEYRINGS, env=env)
         with open(cfile,'wb') as F:
@@ -41,6 +52,14 @@ def gpg_verify(content, sig):
         with open(sfile,'wb') as F:
             F.write(sig)
 
+        print('keys')
+        trust = gpg_mangle_trust(check_output([GPG,'--export-ownertrust']))
+        tfile = os.path.join(D,'trust')
+        with open(tfile,'wb') as F:
+            F.write(trust)
+        check_call([GPG,'--import-ownertrust',tfile])
+        print('trust',check_output([GPG,'--export-ownertrust']))
+# ,'--trust-model','always'
         check_call([GPG,'--verify',sfile,cfile], env=env)
 
 def proc_release(rel):
