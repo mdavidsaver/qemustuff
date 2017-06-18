@@ -29,16 +29,19 @@ def getargs():
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('-D','--display',metavar='spice|X',default='spice',help='Display method')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
+    P.add_argument('--mon',metavar='SOCK',help='path for unix socket of monitor')
     P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
 
     A = P.parse_args()
-    M = re.match(r'([^-]+)-([^.]+).img', A.image)
+    M = re.match(r'(.+)-([^.-]+).img', A.image)
     if not M:
         P.error('incorrect image name format.  Must be "name-arch.img"')
     elif not os.path.isfile(A.image):
         P.error('%s not a file'%A.image)
     if not A.ga:
         A.ga = A.image+'.sock'
+    if not A.mon:
+        A.mon = A.image+'.mon'
     A.name = M.group(1)
     A.arch = M.group(2)
     return A
@@ -74,8 +77,8 @@ def main(A):
     args += ['-m','%d'%A.mem, '-usbdevice', 'tablet']
     args += ['-device', 'virtio-serial-pci']
     # unix socket for monitor console
-    #args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".sock")]
-    #args += ['-monitor','chardev:monitor']
+    args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".mon")]
+    args += ['-monitor','chardev:monitor']
     # spice
     if A.display=='spice':
         args += ['-display','none']
@@ -115,6 +118,11 @@ def main(A):
 
     try:
         os.remove(A.image+".sock")
+    except OSError as e:
+        if e.errno!=2:
+            raise
+    try:
+        os.remove(A.image+".mon")
     except OSError as e:
         if e.errno!=2:
             raise
