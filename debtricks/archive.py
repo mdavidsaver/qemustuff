@@ -151,10 +151,12 @@ class Archive(object):
         self._etag = {}
         self._content = {}
 
-        release_gpg = self.get('Release.gpg')
         release = self.get('Release')
         if secure:
+            release_gpg = self.get('Release.gpg')
             gpg_verify(release, release_gpg)
+        else:
+            _log.warn('Skipping signature check of RELEASE')
 
         release = self.release = Release(release)
 

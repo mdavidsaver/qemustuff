@@ -39,6 +39,7 @@ def getargs():
     P.add_argument('-S','--size',metavar='NUM',help='Size of image (if not existant)')
     P.add_argument('--baseurl',metavar='URL',default='http://ftp.us.debian.org/debian/dists/')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
+    P.add_argument('--insecure', default=True, action='store_false')
     return P.parse_args()
 
 # arch. name mapping from debian to qemu conventions
@@ -73,14 +74,14 @@ class Builder(object):
 
         if args.dist.find(':')!=-1:
             os, _, args.dist = args.dist.partition(':')
-            arch = Archive(os, args.dist)
+            arch = Archive(os, args.dist, secure=args.insecure)
             installer = arch.installer(self.arch)
             if self.arch in ['i386','amd64']:
                 self.fetch = installer.cd('netboot/ubuntu-installer/%s/'%self.arch)
             else:
                 raise RuntimeError("Unsupported arch "+self.arch)
         else:
-            arch = Archive('debian', args.dist)
+            arch = Archive('debian', args.dist, secure=args.insecure)
             installer = arch.installer(self.arch)
             if self.arch in ['i386','amd64']:
                 self.fetch = installer.cd('netboot/debian-installer/%s/'%self.arch)
