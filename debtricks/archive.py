@@ -15,7 +15,7 @@ from urllib3 import connection_from_url
 
 from debian.deb822 import Release, Packages
 
-GPG='/usr/bin/gpg2'
+GPG=['/usr/bin/gpg2','--no-autostart']
 # trusted keys for repo Release.gpg
 KEYRINGS=glob('/etc/apt/trusted.gpg.d/*.gpg')
 # section names in Release
@@ -46,21 +46,21 @@ def gpg_verify(content, sig):
         sfile =  os.path.join(D,'sig')
         os.mkdir(gpgdir, mode=0o700)
 
-        check_call([GPG, '--import']+KEYRINGS, env=env)
+        check_call(GPG+['--import']+KEYRINGS, env=env)
         with open(cfile,'wb') as F:
             F.write(content)
         with open(sfile,'wb') as F:
             F.write(sig)
 
         print('keys')
-        trust = gpg_mangle_trust(check_output([GPG,'--export-ownertrust']))
+        trust = gpg_mangle_trust(check_output(GPG+['--export-ownertrust']))
         tfile = os.path.join(D,'trust')
         with open(tfile,'wb') as F:
             F.write(trust)
-        check_call([GPG,'--import-ownertrust',tfile])
-        print('trust',check_output([GPG,'--export-ownertrust']))
+        check_call(GPG+['--import-ownertrust',tfile])
+        print('trust',check_output(GPG+['--export-ownertrust']))
 # ,'--trust-model','always'
-        check_call([GPG,'--verify',sfile,cfile], env=env)
+        check_call(GPG+['--verify',sfile,cfile], env=env)
 
 def proc_release(rel):
     """Extract a dictionary keyed by file name
@@ -198,7 +198,8 @@ class Archive(object):
         if etag:
             assert src in self._content
             headers['If-Match'] = etag
-        with self._pool.request('GET', url, headers=headers) as R:
+        if True:
+            R = self._pool.request('GET', url, headers=headers)
             _log.debug('Fetch %s with %s -> %d', url, headers, R.status)
             if R.status==304:
                 return self._content[src]
