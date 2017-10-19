@@ -20,3 +20,8 @@ PPC install is not fully automatic
 
 d-i will fail to install quik bootloader.  Continue w/o bootloader.  Extract kernel and initrd from installed image, boot and run 'quikconfig'.  Now can boot normally.
 
+
+
+use minicom to access monitor via unix socket
+
+minicom -D unix#/mnt/vm/stretch-amd64.img.mon

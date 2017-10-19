@@ -28,6 +28,7 @@ def getargs():
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('-D','--display',metavar='spice|X',default='spice',help='Display method')
+    P.add_argument('--unsafe',action='store_true',default=False,help='Unsafe, but faster, disck caching')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
     P.add_argument('--mon',metavar='SOCK',help='path for unix socket of monitor')
     P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
@@ -93,7 +94,10 @@ def main(A):
     args += ['-chardev', 'socket,path=%s,server,nowait,id=agent'%(A.ga,),
              '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
     # disk
-    args += ['-drive', 'file=%s,index=0,media=disk'%A.image]
+    if not A.unsafe:
+        args += ['-drive', 'file=%s,index=0,media=disk'%A.image]
+    else:
+        args += ['-drive', 'file=%s,index=0,media=disk,aio=native,cache=unsafe,cache.direct=on'%A.image]
     # net
     net = ['user','smb=%s'%os.path.expanduser('~')]
     net.extend(A.net)
