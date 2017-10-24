@@ -27,7 +27,7 @@ def getargs():
     P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
-    P.add_argument('-D','--display',metavar='spice|X',default='spice',help='Display method')
+    P.add_argument('-D','--display',metavar='spice|X',default='X',help='Display method')
     P.add_argument('--unsafe',action='store_true',default=False,help='Unsafe, but faster, disck caching')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
     P.add_argument('--mon',metavar='SOCK',help='path for unix socket of monitor')
@@ -77,11 +77,11 @@ def main(A):
     _log.warn('SPICE port %d', A.port)
     args += ['-m','%d'%A.mem, '-usbdevice', 'tablet']
     args += ['-device', 'virtio-serial-pci']
-    # unix socket for monitor console
-    args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".mon")]
-    args += ['-monitor','chardev:monitor']
-    # spice
     if A.display=='spice':
+        # unix socket for monitor console
+        args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".mon")]
+        args += ['-monitor','chardev:monitor']
+        # spice
         args += ['-display','none']
         args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
         args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
