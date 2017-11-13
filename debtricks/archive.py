@@ -89,27 +89,36 @@ class SubManifest(object):
 
 class Manifest(object):
     SubManifest = SubManifest
-    def __init__(self, arch, info, path):
+    def __init__(self, arch, info, path, secure=True):
         self.arch, self._info, self.path = arch, info, path
+        self.secure = secure
     def cd(self, subdir):
         return self.SubManifest(self, subdir)
     def __contains__(self, key):
         return key in self._info
     def get(self, path):
         I = self._info[path]
-        fname = self.path+I['name']
+        if 'name' in I:
+            _log.debug("Info for %s : %s", path, I)
+            fname = self.path+I['name']
+        elif not self.secure:
+            fname = path
+        else:
+            raise RuntimeError("Manifest doesn't mention %s"%path)
+
         hashme = None
         for H in HASHS:
             H=H.lower()
             if H in I:
                 expect = I[H]
                 hashme = hashlib.new(H)
-        if hashme is None:
+        if self.secure and hashme is None:
             raise RuntimeError("No hash information for '%s'"%(fname))
         content = self.arch.get(fname)
-        hashme.update(content)
-        if hashme.hexdigest()!=expect:
-            raise RuntimeError("Hash mismatch for '%s' %s != %s"%(fname, hashme.hexdigest(),expect))
+        if self.secure:
+            hashme.update(content)
+            if self.secure and hashme.hexdigest()!=expect:
+                raise RuntimeError("Hash mismatch for '%s' %s != %s"%(fname, hashme.hexdigest(),expect))
         return content
 
     def getfile(self, path):
@@ -186,7 +195,7 @@ class Archive(object):
 
         info = proc_release(release)
 
-        self._top = self.Manifest(self, info, '')
+        self._top = self.Manifest(self, info, '', secure=secure)
 
     def get(self, src):
         """Fetch file and return content as string.
