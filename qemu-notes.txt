@@ -25,3 +25,11 @@ d-i will fail to install quik bootloader.  Continue w/o bootloader.  Extract ker
 use minicom to access monitor via unix socket
 
 minicom -D unix#/mnt/vm/stretch-amd64.img.mon
+
+
+
+windows
+
+Windows 10 need to enable unauthenticated SMB access
+
+https://support.microsoft.com/fi-fi/help/4046019/guest-access-smb2-disabled-by-default-in-windows-10-server-2016
