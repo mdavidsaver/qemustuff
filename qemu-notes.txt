@@ -9,6 +9,8 @@ Guest setup, debian 8
 
 apt-get install cifs-utils spice-vdagent
 
+aptitude --without-recommends install task-kde-desktop kwin-x11 qemu-guest-agent
+
 mkdir /mnt/host
 
 cat << EOF >> /etc/fstab

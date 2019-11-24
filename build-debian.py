@@ -124,6 +124,7 @@ class Builder(object):
         if (hostarch(), self.arch) in kvm_allowed:
             args += ['-enable-kvm','-vga','qxl']
 
+        args += ['-M', 'q35']
         args += '-boot order=n -m 1024 -no-reboot -usbdevice tablet'.split(' ')
         # cache=unsafe means qemu crash -> corrupt image, but if install fails then we redo anyway
         args += ['-drive', 'file=%s,aio=native,cache=unsafe,cache.direct=on'%self.args.image]
