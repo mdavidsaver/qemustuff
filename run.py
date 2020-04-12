@@ -21,7 +21,7 @@ def getargs():
 
     P = argparse.ArgumentParser(description='Run VM image')
     P.add_argument('image', metavar='NAME', help='VM image file name', type=isfile)
-    P.add_argument('qemuargs', nargs='*')
+    P.add_argument('qemuargs', nargs=argparse.REMAINDER)
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
     P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
