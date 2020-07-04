@@ -110,7 +110,7 @@ def main(A):
         args += ['-enable-kvm']
 
     if A.arch!='powerpc':
-        args += ['-vga','qxl']
+        args += ['-vga','qxl', '-cpu', 'host,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_reset']
 
     args += A.qemuargs
 
