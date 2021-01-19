@@ -27,6 +27,7 @@ def getargs():
     P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
+    P.add_argument('--isolate',action='store_true')
     P.add_argument('-D','--display',metavar='spice|X',default='X',help='Display method')
     P.add_argument('--unsafe',action='store_true',default=False,help='Unsafe, but faster, disck caching')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
@@ -100,6 +101,8 @@ def main(A):
         args += ['-drive', 'file=%s,index=0,media=disk,aio=native,cache=unsafe,cache.direct=on'%A.image]
     # net
     net = ['user','smb=%s'%os.path.expanduser('~')]
+    if A.isolate:
+        net.append('restrict=on')
     net.extend(A.net)
     args += ['-net', 'nic', '-net', ','.join(net)]
 
