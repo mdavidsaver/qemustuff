@@ -34,7 +34,7 @@ def getargs():
     P = argparse.ArgumentParser(description='Populate Debian vm image')
     P.add_argument('image', metavar='FILE', help='VM image file name')
     P.add_argument('-a','--arch',metavar='NAME', default='host', help='Debian arch. name')
-    P.add_argument('-d','--dist',metavar='NAME', default='jessie', help='Debian code name')
+    P.add_argument('-d','--dist',metavar='NAME', default='jessie', help='Debian code name, or ubuntu:codename')
     P.add_argument('-P','--preseed',metavar='FILE',help='Debian pre-seed file', type=isfile)
     P.add_argument('-S','--size',metavar='NUM',help='Size of image (if not existant)')
     P.add_argument('--baseurl',metavar='URL',default='http://ftp.us.debian.org/debian/dists/')
@@ -144,7 +144,7 @@ class Builder(object):
             elif self.arch=='powerpc':
                 kernname = 'vmlinux'
 
-            args += ['-net', 'nic', '-net', 'user,tftp=%s'%self.workdir,
+            args += ['-net', 'nic,model=e1000', '-net', 'user,tftp=%s'%self.workdir,
                      '-kernel', os.path.join(D, kernname), '-initrd', os.path.join(D, 'initrd.gz')]
             if PS:
                 args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']

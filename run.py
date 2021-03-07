@@ -11,7 +11,7 @@ def getargs():
     def lvl(name):
         L = logging.getLevelName(name)
         if type(L)!=int:
-            raise argparse.ArgumentTypeError('invalid log level %s'%A.lvl)
+            raise argparse.ArgumentTypeError('invalid log level '+name)
         return L
 
     def isfile(name):
@@ -104,7 +104,7 @@ def main(A):
     if A.isolate:
         net.append('restrict=on')
     net.extend(A.net)
-    args += ['-net', 'nic', '-net', ','.join(net)]
+    args += ['-net', 'nic,model=e1000', '-net', ','.join(net)]
 
     if A.smp>1:
         args += ['-smp','cpus=%d'%A.smp]
