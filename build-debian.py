@@ -140,6 +140,7 @@ class Builder(object):
 
             if self.arch in ['i386','amd64']:
                 kernname = 'linux'
+                args += ['-M', 'q35']
 
             elif self.arch=='powerpc':
                 kernname = 'vmlinux'

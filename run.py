@@ -75,8 +75,11 @@ def main(A):
         sys.exit(1)
 
     args = [exe]
+    args += ['-M', 'q35']
     _log.warn('SPICE port %d', A.port)
-    args += ['-m','%d'%A.mem, '-usbdevice', 'tablet']
+    args += ['-m','%d'%A.mem]
+    args += ['-device', 'intel-iommu']
+    args += ['-usbdevice', 'tablet']
     args += ['-device', 'virtio-serial-pci']
     if A.display=='spice':
         # unix socket for monitor console
