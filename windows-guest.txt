@@ -21,7 +21,7 @@ run Visual Studio Installer and Modify to include MSVC
 
 install https://chocolatey.org/install
 
-choco install make strawberryperl cmake python -y
+choco install git make strawberryperl cmake python -y
 
 install git https://git-scm.com/download/win
 

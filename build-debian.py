@@ -73,8 +73,9 @@ class Builder(object):
             self.arch = hostarch()
 
         if args.dist.find(':')!=-1:
+            # ubuntu doesn't include images in main archive listing anymore :(
             os, _, args.dist = args.dist.partition(':')
-            arch = Archive(os, args.dist, secure=args.insecure)
+            arch = Archive(os, args.dist+'-updates', secure=args.insecure)
             installer = arch.installer(self.arch)
             if self.arch in ['i386','amd64']:
                 self.fetch = installer.cd('netboot/ubuntu-installer/%s/'%self.arch)

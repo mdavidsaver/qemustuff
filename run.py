@@ -80,6 +80,8 @@ def main(A):
     args += ['-m','%d'%A.mem]
     args += ['-device', 'intel-iommu']
     args += ['-usbdevice', 'tablet']
+#    args += ['-device', 'qemu-xhci']
+#    args += ['-device', 'usb-tablet']
     args += ['-device', 'virtio-serial-pci']
     if A.display=='spice':
         # unix socket for monitor console
@@ -108,6 +110,9 @@ def main(A):
         net.append('restrict=on')
     net.extend(A.net)
     args += ['-net', 'nic,model=e1000', '-net', ','.join(net)]
+#    args += ['-nic', ','.join(net)]
+#    args += ['-device', 'ioh3420,id=pbus,chassis=1']
+#    args += ['-netdev', ','.join(net), '-device', 'e1000e,bus=pbus,id=thenic,netdev=thenet']
 
     if A.smp>1:
         args += ['-smp','cpus=%d'%A.smp]
