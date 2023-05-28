@@ -6,16 +6,26 @@ unzip WinDev2005Eval.VirtualBox.zip
 tar -xf WinDev2005Eval.ova
 qemu-img convert -O qcow2 WinDev2005Eval-disk001.vmdk WinDev2005Eval.qcow2
 rm WinDev2005Eval.ovf WinDev2005Eval-disk001.vmdk WinDev2005Eval.mf WinDev2005Eval.ova
-qemu-img create -b WinDev2005Eval.qcow2 -f qcow2 WinDev2005Eval-amd64.qcow2
+qemu-img create -b WinDev2005Eval.qcow2 -F qcow2 -f qcow2 WinDev2005Eval-amd64.qcow2
 
+
+On first run, install virtio drivers and guest agent from .iso
+
+https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/stable-virtio/virtio-win.iso
 
 Windows 10 need to enable unauthenticated SMB access
 
 https://support.microsoft.com/fi-fi/help/4046019/guest-access-smb2-disabled-by-default-in-windows-10-server-2016
 
+    Open the Local Group Policy Editor (gpedit.msc) on your Windows device.
+    In the console tree, select Computer Configuration > Administrative Templates > Network > Lanman Workstation.
+    For the setting, right-click Enable insecure guest logons and select Edit.
+    Select Enabled > OK.
+
+
 Add network driver \\10.0.2.4\qemu\
 
-install spice client https://www.spice-space.org/download.html
+#install spice client https://www.spice-space.org/download.html
 
 run Visual Studio Installer and Modify to include MSVC
 
@@ -23,7 +33,6 @@ install https://chocolatey.org/install
 
 choco install git make strawberryperl cmake python -y
 
-install git https://git-scm.com/download/win
 
   call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
   cd epics-base

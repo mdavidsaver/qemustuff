@@ -85,11 +85,11 @@ def main(A):
     args += ['-device', 'virtio-serial-pci']
     if A.display=='spice':
         # unix socket for monitor console
-        args += ['-chardev','socket,id=monitor,path=%s,server,nowait'%(A.image+".mon")]
+        args += ['-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.image+".mon")]
         args += ['-monitor','chardev:monitor']
         # spice
         args += ['-display','none']
-        args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4,disable-ticketing'%A.port] # TODO password=
+        args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4=on,disable-ticketing=on'%A.port] # TODO password=
         args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
         args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
     elif A.display=='X':
@@ -97,7 +97,7 @@ def main(A):
     else:
         _log.error("Unknown display method %s", A.display)
     # guest agent
-    args += ['-chardev', 'socket,path=%s,server,nowait,id=agent'%(A.ga,),
+    args += ['-chardev', 'socket,path=%s,server=on,wait=off,id=agent'%(A.ga,),
              '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
     # disk
     if not A.unsafe:
