@@ -90,6 +90,7 @@ def main(A):
     ]
     if A.display=='spice':
         args += [
+            '-vga','qxl',
             # unix socket for monitor console
             '-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.image+".mon"),
             '-monitor','chardev:monitor',
@@ -100,6 +101,10 @@ def main(A):
             '-chardev', 'spicevmc,id=spicechannel0,name=vdagent',
         ]
     elif A.display=='X':
+        args += ['-vga','qxl']
+    elif A.display=='gl':
+        args += ['-device', 'virtio-vga-gl', '-display', 'gtk,gl=on']
+    elif A.display=='none':
         pass
     else:
         _log.error("Unknown display method %s", A.display)
@@ -125,7 +130,7 @@ def main(A):
         args += ['-enable-kvm']
 
     if A.arch!='powerpc':
-        args += ['-vga','qxl', '-cpu', 'host,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_reset,hv_time,hv_relaxed']
+        args += ['-cpu', 'host,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_reset,hv_time,hv_relaxed']
 
     args += A.qemuargs
 
