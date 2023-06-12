@@ -84,7 +84,8 @@ def main(A):
         '-device', 'virtio-rng-pci,rng=rng0',
         '-object', 'rng-random,id=rng0,filename=/dev/urandom',
         '-drive', 'file=%s,index=0,media=disk'%A.image,
-        '-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
+        #'-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
+        '-virtfs', 'local,security_model=none,mount_tag=home,path=%s'%os.path.expanduser('~'),
         '-device', 'virtio-serial-pci',
     ]
     if A.display=='spice':
