@@ -29,7 +29,6 @@ def getargs():
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('--isolate',action='store_true')
     P.add_argument('-D','--display',metavar='spice|X',default='X',help='Display method')
-    P.add_argument('--unsafe',action='store_true',default=False,help='Unsafe, but faster, disck caching')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
     P.add_argument('--mon',metavar='SOCK',help='path for unix socket of monitor')
     P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
@@ -74,45 +73,49 @@ def main(A):
         _log.error('Failed to find emulator for %s', deb2qemu[A.arch])
         sys.exit(1)
 
-    args = [exe]
-    args += ['-M', 'q35']
     _log.warn('SPICE port %d', A.port)
-    args += ['-m','%d'%A.mem]
-    args += ['-device', 'intel-iommu']
-    args += ['-usbdevice', 'tablet']
-#    args += ['-device', 'qemu-xhci']
-#    args += ['-device', 'usb-tablet']
-    args += ['-device', 'virtio-serial-pci']
+    args = [
+        exe,
+        '-M', 'q35',
+        '-m','%d'%A.mem,
+        '-device', 'intel-iommu',
+        '-usbdevice', 'tablet',
+        '-device', 'virtio-balloon',
+        '-device', 'virtio-rng-pci,rng=rng0',
+        '-object', 'rng-random,id=rng0,filename=/dev/urandom',
+        '-drive', 'file=%s,index=0,media=disk'%A.image,
+        '-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
+        '-device', 'virtio-serial-pci',
+    ]
     if A.display=='spice':
-        # unix socket for monitor console
-        args += ['-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.image+".mon")]
-        args += ['-monitor','chardev:monitor']
-        # spice
-        args += ['-display','none']
-        args += ['-spice', 'addr=127.0.0.1,port=%d,ipv4=on,disable-ticketing=on'%A.port] # TODO password=
-        args += ['-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0']
-        args += ['-chardev', 'spicevmc,id=spicechannel0,name=vdagent']
+        args += [
+            # unix socket for monitor console
+            '-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.image+".mon"),
+            '-monitor','chardev:monitor',
+            # spice
+            '-display','none',
+            '-spice', 'addr=127.0.0.1,port=%d,ipv4=on,disable-ticketing=on'%A.port, # TODO password=
+            '-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0',
+            '-chardev', 'spicevmc,id=spicechannel0,name=vdagent',
+        ]
     elif A.display=='X':
         pass
     else:
         _log.error("Unknown display method %s", A.display)
     # guest agent
-    args += ['-chardev', 'socket,path=%s,server=on,wait=off,id=agent'%(A.ga,),
-             '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0']
-    # disk
-    if not A.unsafe:
-        args += ['-drive', 'file=%s,index=0,media=disk'%A.image]
-    else:
-        args += ['-drive', 'file=%s,index=0,media=disk,aio=native,cache=unsafe,cache.direct=on'%A.image]
+    args += [
+        '-chardev', 'socket,path=%s,server=on,wait=off,id=agent'%(A.ga,),
+        '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0',
+    ]
     # net
     net = ['user','smb=%s'%os.path.expanduser('~')]
     if A.isolate:
         net.append('restrict=on')
     net.extend(A.net)
-    args += ['-net', 'nic,model=e1000', '-net', ','.join(net)]
-#    args += ['-nic', ','.join(net)]
-#    args += ['-device', 'ioh3420,id=pbus,chassis=1']
-#    args += ['-netdev', ','.join(net), '-device', 'e1000e,bus=pbus,id=thenic,netdev=thenet']
+    args += [
+        '-net', 'nic,model=e1000',
+        '-net', ','.join(net),
+    ]
 
     if A.smp>1:
         args += ['-smp','cpus=%d'%A.smp]
@@ -128,19 +131,23 @@ def main(A):
     _log.debug('Invoke: %s', ' '.join(args))
 
     _log.info('Run emulator')
-    from subprocess import check_call
-    check_call(args)
+    from subprocess import check_call, call
+    try:
+        if A.display=='spice':
+            call("spicy -p %d &"%A.port, shell=True)
+        check_call(args)
 
-    try:
-        os.remove(A.image+".sock")
-    except OSError as e:
-        if e.errno!=2:
-            raise
-    try:
-        os.remove(A.image+".mon")
-    except OSError as e:
-        if e.errno!=2:
-            raise
+    finally:
+        try:
+            os.remove(A.image+".sock")
+        except OSError as e:
+            if e.errno!=2:
+                raise
+        try:
+            os.remove(A.image+".mon")
+        except OSError as e:
+            if e.errno!=2:
+                raise
 
 if __name__=='__main__':
     A = getargs()

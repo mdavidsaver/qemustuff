@@ -10,6 +10,11 @@ Guest setup, debian 8
 apt-get install cifs-utils spice-vdagent
 
 aptitude --without-recommends install task-kde-desktop kwin-x11 qemu-guest-agent
+aptitude --without-recommends install task-xfce-desktop mousepad xfce4-terminal xserver-xorg-video-qxl
+
+xrandr --verbose --output Virtual-1 --auto
+
+xev -root -event randr | grep --line-buffered RRScreenChangeNotify | while read junk; do xrandr --output Virtual-1 --auto; done
 
 mkdir /mnt/host
 
