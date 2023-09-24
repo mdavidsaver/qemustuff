@@ -6,24 +6,33 @@ _log = logging.getLogger(__name__)
 
 import os, sys, hashlib, stat, time
 from glob import glob
-from subprocess import check_call, check_output
+import subprocess
 from tempfile import TemporaryDirectory, SpooledTemporaryFile
 from collections import defaultdict
 from shutil import copyfileobj
+from shlex import quote as shq
 
 from urllib3 import connection_from_url
 
 from debian.deb822 import Release, Packages
 
-GPG=['/usr/bin/gpg2','--no-autostart']
+GPG=['/usr/bin/gpg','--no-autostart']
 # trusted keys for repo Release.gpg
-KEYRINGS=glob('/etc/apt/trusted.gpg.d/*.gpg')
+KEYRINGS=glob('/etc/apt/trusted.gpg.d/*.asc')
 # section names in Release
 HASHS=['SHA1','SHA256']
 
 __all__ = [
     'Archive',
 ]
+
+def check_call(args, **kws):
+    print("CALL", ' '.join([shq(a) for a in args]))
+    return subprocess.check_call(args, **kws)
+
+def check_output(args, **kws):
+    print("CALL", ' '.join([shq(a) for a in args]))
+    return subprocess.check_output(args, **kws)
 
 def gpg_mangle_trust(content):
     ret = []
