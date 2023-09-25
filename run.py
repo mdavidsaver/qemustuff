@@ -114,7 +114,7 @@ def main(A):
         '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0',
     ]
     # net
-    net = ['user','smb=%s'%os.path.expanduser('~')]
+    net = ['user']
     if A.isolate:
         net.append('restrict=on')
     net.extend(A.net)
