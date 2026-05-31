@@ -67,7 +67,7 @@ def hostarch():
 
 def main(A):
     _log.debug('Args: %s', A)
-    
+
     exe = A.exe or shutil.which('qemu-system-%s'%deb2qemu[A.arch])
     if not exe:
         _log.error('Failed to find emulator for %s', deb2qemu[A.arch])
@@ -83,7 +83,7 @@ def main(A):
         '-device', 'virtio-balloon',
         '-device', 'virtio-rng-pci,rng=rng0',
         '-object', 'rng-random,id=rng0,filename=/dev/urandom',
-        '-drive', 'file=%s,index=0,media=disk'%A.image,
+        '-drive', 'if=virtio,file=%s,index=0,media=disk'%A.image,
         #'-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
         '-virtfs', 'local,security_model=none,mount_tag=home,path=%s'%os.path.expanduser('~'),
         '-device', 'virtio-serial-pci',
@@ -101,9 +101,13 @@ def main(A):
             '-chardev', 'spicevmc,id=spicechannel0,name=vdagent',
         ]
     elif A.display=='X':
-        args += ['-vga','qxl']
+        args += ['-vga','virtio', '-display', 'gtk']
     elif A.display=='gl':
-        args += ['-device', 'virtio-vga-gl', '-display', 'gtk,gl=on']
+        args += [
+            '-device', 'virtio-vga-gl',
+            '-vga', 'none',
+            '-display', 'gtk,gl=on',
+        ]
     elif A.display=='none':
         pass
     else:
@@ -119,7 +123,7 @@ def main(A):
         net.append('restrict=on')
     net.extend(A.net)
     args += [
-        '-net', 'nic,model=e1000',
+        '-net', 'nic,model=virtio',
         '-net', ','.join(net),
     ]
 
@@ -134,7 +138,7 @@ def main(A):
 
     args += A.qemuargs
 
-    _log.debug('Invoke: %s', ' '.join(args))
+    _log.info('Invoke: %s', ' '.join(args))
 
     _log.info('Run emulator')
     from subprocess import check_call, call
