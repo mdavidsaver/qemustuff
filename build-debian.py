@@ -105,13 +105,16 @@ class Builder(object):
                 raise RuntimeError("Image file does not exist and no valid size is provided")
             from subprocess import check_call
             _log.info("Create image file '%s' with %s"%(self.args.image, S))
-            check_call(['qemu-img','create',self.args.image,S])
+            check_call([
+                'qemu-img','create',
+                '-f','qcow2',
+                self.args.image,S,
+            ])
         elif S:
             raise RuntimeError("Image file exists so size size can not be provided")
 
     def run(self):
         from tempfile import TemporaryDirectory
-        from urllib.error import HTTPError
 
         exe = shutil.which('qemu-system-%s'%deb2qemu[self.arch])
         if not exe:
@@ -125,10 +128,14 @@ class Builder(object):
         if (hostarch(), self.arch) in kvm_allowed:
             args += ['-enable-kvm','-vga','qxl']
 
-        args += ['-M', 'q35']
-        args += '-boot order=n -m 1024 -no-reboot -usbdevice tablet'.split(' ')
-        # cache=unsafe means qemu crash -> corrupt image, but if install fails then we redo anyway
-        args += ['-drive', 'file=%s,aio=native,cache=unsafe,cache.direct=on'%self.args.image]
+        args += [
+            #'-M', 'q35',
+            '-boot', 'order=n',
+            '-m', '4096',
+            '-no-reboot',
+            '-usbdevice', 'tablet',
+            '-drive', 'if=virtio,file=%s,index=0,media=disk'%self.args.image,
+        ]
 
         with TemporaryDirectory() as D:
             self.workdir = D
@@ -146,10 +153,16 @@ class Builder(object):
             elif self.arch=='powerpc':
                 kernname = 'vmlinux'
 
-            args += ['-net', 'nic,model=e1000', '-net', 'user,tftp=%s'%self.workdir,
-                     '-kernel', os.path.join(D, kernname), '-initrd', os.path.join(D, 'initrd.gz')]
+            args += [
+                '-net', 'nic,model=virtio',
+                '-net', 'user,tftp=%s'%self.workdir,
+                '-kernel', os.path.join(D, kernname),
+                '-initrd', os.path.join(D, 'initrd.gz'),
+            ]
             if PS:
-                args += ['-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet']
+                args += [
+                    '-append','auto=true priority=critical preseed/url=tftp://10.0.2.2/preseed.cfg --- quiet',
+                ]
                 shutil.copyfile(os.path.join(imat, 'postinst.sh'),
                                 os.path.join(self.workdir, 'postinst.sh'))
                 with open(os.path.join(self.workdir, 'preseed.cfg'), 'ab') as FP:
