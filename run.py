@@ -26,7 +26,7 @@ def getargs():
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
     P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
     P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
-    P.add_argument('-M','--mount',metavar='NAME:PATH',action='append',
+    P.add_argument('-M','--mount',metavar='NAME:PATH',action='append',default=[],
                    help='virtfs paths to export')
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('--isolate',action='store_true')
@@ -89,13 +89,10 @@ def main(A):
         #'-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
         '-device', 'virtio-serial-pci',
     ]
-    if A.mount is None:
-        A.mount=['home:~']
-    if A.mount != ['none']:
-        for mnt in A.mount:
-            mname, mpath = mnt.split(':', 1)
-            mpath = os.path.expanduser(mpath)
-            args += ['-virtfs', f'local,security_model=none,mount_tag={mname},path={mpath}']
+    for mnt in A.mount:
+        mname, mpath = mnt.split(':', 1)
+        mpath = os.path.expanduser(mpath)
+        args += ['-virtfs', f'local,security_model=none,mount_tag={mname},path={mpath}']
     if A.display=='spice':
         args += [
             '-vga','qxl',
