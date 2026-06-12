@@ -1,0 +1,26 @@
+#cloud-config
+
+package_update: true
+packages:
+  - nano
+  - less
+  - git
+  - qemu-guest-agent
+  - ansible-core
+
+users:
+  - name: epics-dev
+    plain_text_passwd: epics-dev
+    lock_passwd: false
+    groups: [audio, dialout, input, render, video, wheel]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+
+runcmd:
+  - >
+    git clone --recursive
+    --branch 2026-osprey-training
+    https://github.com/osprey-dcs/training-collection
+    /home/epics-dev/training
+  - chown -R epics-dev:epics-dev /home/epics-dev/training
+  - su -c 'cd ~/training && ./vm-setup/update.sh' epics-dev

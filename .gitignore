@@ -2,6 +2,7 @@
 *.img
 *.conf
 *.qcow2
+*.iso
 /download/
 /bcache/
 __pycache__

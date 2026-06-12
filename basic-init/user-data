@@ -1,0 +1,29 @@
+#cloud-config
+
+hostname: vm
+timezone: America/Los_Angeles
+
+package_update: true
+packages:
+  - nano
+  - less
+  - git
+  - qemu-guest-agent
+  - nftables
+  - apt:
+    - aptitude
+    - bind9-dnsutils
+    - net-tools
+    - nullmailer
+    - spice-vdagent
+
+users:
+  - name: user
+    plain_text_passwd: helloworld
+    lock_passwd: false
+    groups: [audio, dialout, input, render, video, wheel]
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    shell: /bin/bash
+
+mounts:
+  - ["host", "/mnt/host", "9p", "trans=virtio,defaults,nofail"]

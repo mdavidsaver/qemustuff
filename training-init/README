@@ -1,0 +1,7 @@
+https://docs.cloud-init.io/en/latest/tutorial/qemu.html
+
+sudo cloud-init schema --system --annotate
+
+or:
+
+cloud-init schema -c test.yml --annotate
