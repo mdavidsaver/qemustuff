@@ -5,6 +5,9 @@ _log = logging.getLogger(__name__)
 
 import os, sys, re
 import shutil
+from subprocess import check_call, call
+from contextlib import ExitStack
+from pathlib import Path
 
 def getargs():
     import argparse
@@ -15,7 +18,8 @@ def getargs():
         return L
 
     def isfile(name):
-        if not os.path.isfile(name):
+        name = Path(name)
+        if not name.is_file():
             raise argparse.ArgumentTypeError('file does not exist %s'%name)
         return name
 
@@ -24,29 +28,26 @@ def getargs():
     P.add_argument('qemuargs', nargs=argparse.REMAINDER)
     P.add_argument('-p','--port', metavar='INT', type=int, default=5990, help='SPICE display port')
     P.add_argument('-l','--lvl',metavar='NAME',default='INFO',help='python log level', type=lvl)
-    P.add_argument('-j','--smp',metavar='NUM',default=0,help='Number of vCPUs', type=int)
-    P.add_argument('-m','--mem',metavar='NUM',default=1024,help='RAM size in MB', type=int)
+    P.add_argument('-j','--smp',metavar='NUM',default=1,help='Number of vCPUs', type=int)
+    P.add_argument('-m','--mem',metavar='NUM',default=4196,help='RAM size in MB', type=int)
     P.add_argument('-M','--mount',metavar='NAME:PATH',action='append',default=[],
                    help='virtfs paths to export')
     P.add_argument('-N','--net',metavar='STR',default=[],action='append',help='Additional options for -net user')
     P.add_argument('--isolate',action='store_true')
-    P.add_argument('-D','--display',metavar='spice|X',default='X',help='Display method')
+    P.add_argument('-D','--display',metavar='spice|X|gl|none',default='X',help='Display method')
     P.add_argument('--ga',metavar='SOCK',help='path for unix socket of guest agent')
     P.add_argument('--mon',metavar='SOCK',help='path for unix socket of monitor')
     P.add_argument('--exe',metavar='PATH',help='Use specific QEMU executable')
 
     A = P.parse_args()
-    M = re.match(r'(.+)-([^.-]+).img', A.image)
-    if not M:
+    try:
+        A.name, A.arch = A.image.stem.rsplit('-',1)
+    except TypeError:
         P.error('incorrect image name format.  Must be "name-arch.img"')
-    elif not os.path.isfile(A.image):
-        P.error('%s not a file'%A.image)
     if not A.ga:
-        A.ga = A.image+'.sock'
+        A.ga = A.image.with_suffix('.sock')
     if not A.mon:
-        A.mon = A.image+'.mon'
-    A.name = M.group(1)
-    A.arch = M.group(2)
+        A.mon = A.image.with_suffix('.mon')
     return A
 
 # arch. name mapping from debian to qemu conventions
@@ -54,10 +55,11 @@ deb2qemu = {
     'i386':'i386',
     'amd64':'x86_64',
     'powerpc':'ppc',
+    'arm64':'aarch64',
 }
 
 def hostarch():
-    import platform, re
+    import platform
     if re.match(r'i.86', platform.machine()):
         return 'i386'
     elif 'x86_64'==platform.machine():
@@ -75,54 +77,67 @@ def main(A):
         _log.error('Failed to find emulator for %s', deb2qemu[A.arch])
         sys.exit(1)
 
+    # https://www.qemu.org/docs/master/system/qemu-manpage.html
     _log.warn('SPICE port %d', A.port)
     args = [
         exe,
-        '-M', 'q35',
+        '-M', 'q35,accel=kvm:tcg',
+        '-device', 'intel-iommu', # requires q35
         '-m','%d'%A.mem,
-        '-device', 'intel-iommu',
+        '-smp','cpus=%d'%A.smp,
         '-usbdevice', 'tablet',
+        '-parallel', 'none',
         '-device', 'virtio-balloon',
         '-device', 'virtio-rng-pci,rng=rng0',
         '-object', 'rng-random,id=rng0,filename=/dev/urandom',
         '-drive', 'if=virtio,file=%s,index=0,media=disk'%A.image,
         #'-fw_cfg', 'name=mdtest,string=hello', # modprobe qemu_fw_cfg | ls /sys/firmware/qemu_fw_cfg
         '-device', 'virtio-serial-pci',
+        # guest agent
+        '-chardev', 'socket,path=%s,server=on,wait=off,id=agent'%(A.ga,),
+        '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0',
     ]
+
+    if A.arch==hostarch():
+        # https://www.qemu.org/docs/master/system/i386/cpu.html
+        args += ['-cpu', 'host']
+
     for mnt in A.mount:
         mname, mpath = mnt.split(':', 1)
         mpath = os.path.expanduser(mpath)
         args += ['-virtfs', f'local,security_model=none,mount_tag={mname},path={mpath}']
+
     if A.display=='spice':
         args += [
             '-vga','qxl',
             # unix socket for monitor console
-            '-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.image+".mon"),
+            '-chardev','socket,id=monitor,path=%s,server=on,wait=off'%(A.mon),
             '-monitor','chardev:monitor',
             # spice
             '-display','none',
-            '-spice', 'addr=127.0.0.1,port=%d,ipv4=on,disable-ticketing=on'%A.port, # TODO password=
+            '-spice', 'addr=127.0.0.1,port=%d,ipv4=on,disable-ticketing=on'%A.port,
             '-device', 'virtserialport,chardev=spicechannel0,name=com.redhat.spice.0',
             '-chardev', 'spicevmc,id=spicechannel0,name=vdagent',
         ]
     elif A.display=='X':
-        args += ['-vga','virtio', '-display', 'gtk']
-    elif A.display=='gl':
         args += [
-            '-device', 'virtio-vga-gl',
+            '-vga','virtio',
+            '-display', 'gtk,zoom-to-fit=on',
+        ]
+    elif A.display=='gl':
+        # https://www.qemu.org/docs/master/system/devices/virtio/virtio-gpu.html
+        args += [
             '-vga', 'none',
-            '-display', 'gtk,gl=on',
+            '-device', 'virtio-vga-gl',
+            '-display', 'gtk,zoom-to-fit=on,gl=on',
         ]
     elif A.display=='none':
-        pass
+        args += ['-vga', 'none']
     else:
         _log.error("Unknown display method %s", A.display)
-    # guest agent
-    args += [
-        '-chardev', 'socket,path=%s,server=on,wait=off,id=agent'%(A.ga,),
-        '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0',
-    ]
+
     # net
+    # https://www.qemu.org/docs/master/system/devices/net.html
     net = ['user']
     if A.isolate:
         net.append('restrict=on')
@@ -132,37 +147,18 @@ def main(A):
         '-net', ','.join(net),
     ]
 
-    if A.smp>1:
-        args += ['-smp','cpus=%d'%A.smp]
-
-    if A.arch==hostarch() or (A.arch=='i386' and hostarch()=='amd64'):
-        args += ['-enable-kvm']
-
-    if A.arch!='powerpc':
-        args += ['-cpu', 'host,hv_vpindex,hv_runtime,hv_synic,hv_stimer,hv_reset,hv_time,hv_relaxed']
-
     args += A.qemuargs
 
     _log.info('Invoke: %s', ' '.join(args))
 
     _log.info('Run emulator')
-    from subprocess import check_call, call
-    try:
+    with ExitStack() as cleaner:
+        cleaner.callback(A.ga.unlink, missing_ok=True)
+        cleaner.callback(A.mon.unlink, missing_ok=True)
+
         if A.display=='spice':
             call("spicy -p %d &"%A.port, shell=True)
         check_call(args)
-
-    finally:
-        try:
-            os.remove(A.image+".sock")
-        except OSError as e:
-            if e.errno!=2:
-                raise
-        try:
-            os.remove(A.image+".mon")
-        except OSError as e:
-            if e.errno!=2:
-                raise
 
 if __name__=='__main__':
     A = getargs()
